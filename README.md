@@ -139,3 +139,14 @@ __forceinline bool AntiDebug::Interals::CheckWindowClassName()
 <sub>Pārējie paņēmieni aplūkojami projektā.</sub>
 
 # asio3_interface - Asus drivera vājības izmantošana, lai iegūtu RING-0 privilēģijas.
+<sub>Bildē aplūkojamas asus izplatītās un licenzētās programmas, kurās vājības tika konstatētas un tiek pielietotas vēl šodien.</sub>
+![alt text](https://i.gyazo.com/cae4dbb5f4c00d8174c57325721754ce.png)
+
+
+## Vājibas simptomi
+<sub>Bildē aplūkojamas asus drivera (AsIO3.sys) importētās funckijas.</sub>
+![alt text](https://i.gyazo.com/b9fbd64e3e3e6b4f7b90a2ae3cccf7b7.png)
+
+**ZwMapViewOfSection** - Šinī gadījumā tiek izmantos, lai sasaistītu virtuālo atmiņu ar fizikālo atmiņu. (RAM)
+**ZwUnmapViewOfSection** - Šinī gadījumā tiek izmantos, lai atbrīvotu virtuālo atmiņu.
+
