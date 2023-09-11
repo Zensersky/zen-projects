@@ -138,6 +138,4 @@ __forceinline bool AntiDebug::Interals::CheckWindowClassName()
 ```
 <sub>Pārējie paņēmieni aplūkojami projektā.</sub>
 
-
-
-# New Title hey
+# asio3_interface - Asus drivera vājības izmantošana, lai iegūtu RING-0 privilēģijas.
