@@ -451,7 +451,7 @@ bool func2(PVOID mdl, int a2, int a3, int a4, int a5, int a6, int a7, int a8)
 }
 ```
 
-Aplūkosim pielietojumi
+Aplūkosim pielietojumu
 ```cpp
 int main()
 {
@@ -542,3 +542,100 @@ Aplūkosim safe_call funkciju, lai vairāk saprastu kā funkciju dati tiek main�
         return ret;
     }
 ```
+
+# custom-mysql-requests
+**Projekta mērķis** : Ar php palīdzību elemtārā un drošā veidā sazināties ar mysql datubāzi.  
+**Kur tiek pielietots** : Personīgos projektos.  
+
+Aplūkosim piemēru, kur izmantojot mysql php klasi, ļoti vienkārši spējam sazināties ar datu bāzi.  
+```php
+public function renew_key(&$response, $user_id, $Token) {
+        if($user_id == -1) {
+            $response .= "userid invalid!\n";
+            return 0;
+        }
+
+        //We call this here in order to delete old tokens that have expired
+        $i_xf = new ia_xenforo_interface();
+        $i_xf->xenforo_has_active_subscriptions($user_id, $response);
+
+        $mysql = IA_MySql::get_instance();
+        //Check if token exists
+        $mysql_rows = $mysql->execute_command("SELECT * FROM `User-Tokens` WHERE `Token`=?;", "s", array($Token));
+        if(count($mysql_rows) <= 0) {
+            $response .= "No token found!\n";
+            return 0;
+        }
+        if($mysql_rows[0]['IsUsed'] == 1) {
+            $response .= "Token already used!\n";
+            return 0;
+        }
+
+        $current_date = date("Y-m-d");
+
+        $token_index = $mysql_rows[0]['Index'];
+        $token_value = $mysql_rows[0]['Token'];
+        $token_type = $mysql_rows[0]['TokenType'];
+        $token_expire_type = $mysql_rows[0]['SubscriptionLength'];
+        $token_addons = $mysql_rows[0]['KeyAddons'];
+
+        $this->internal_activate_token($response, $user_id, $token_index, $token_type, $token_expire_type);
+
+        //KEY ADDONS
+        if(strlen($token_addons) > 0) {
+            //That means this key has additional goodies we should activate
+            foreach (explode(',', $token_addons) as $addon_token_type) {
+                if(is_numeric($addon_token_type)) {
+               //Create a new key
+               $mysql->execute_command("INSERT INTO `User-Tokens` (`Token`, `TokenType`, `SubscriptionLength`, `IsUsed`, `TokenOwner`, `ExpireDate`) VALUES (?, ?, ?, '0', '', '');", "sii", array($token_value, $addon_token_type, $token_expire_type));
+               //Get the key index
+               $mysql_rows = $mysql->execute_command("SELECT * FROM `User-Tokens` WHERE `Token`=? AND `TokenType`=?;", "si", array($token_value, $addon_token_type));
+               if(count($mysql_rows) <= 0) {
+                $response .= "Failed fetching joint token index\n";
+                return 0;
+              }
+               $addon_token_index = $mysql_rows[0]['Index'];
+
+              $this->internal_activate_token($response, $user_id, $addon_token_index, $addon_token_type, $token_expire_type);
+
+                }
+            }
+        }
+
+  
+        return 1;
+    }
+```
+
+# custom-webhook-handling
+**Projekta mērķis** : Ar php palīdzību drošā veidā uzņemt informāciju no e-komercijas pakalojuma sellix.  
+**Kur tiek pielietots** : Personīgos projektos.  
+
+Aplūkosim piemēru, kā apstrādājam pieejamos datus.
+```php
+require_once('sellix-webhook.inc.php');
+require_once($_SERVER['DOCUMENT_ROOT'] . '/scripts/IAdb.inc.php');
+
+  $payload = file_get_contents('php://input');
+  $sellix_interface = new sellix_handler();
+  if ($sellix_interface->verify_header() == 1) {
+    // handle valid webhook
+    echo "Signature valid!\n";
+
+    $json_data = $sellix_interface->get_sellix_json_data($payload);
+    
+    if ($json_data === null) {
+      $json_error = json_last_error_msg();
+      error_log("JSON decoding error: $json_error");
+      return;
+    }
+
+    echo "event: " . $json_data->event . " \n";
+    if ($json_data->event == 'order:paid') {
+	//Code here
+	}
+//Code here
+}
+```
+
+
