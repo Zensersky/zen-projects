@@ -638,4 +638,17 @@ require_once($_SERVER['DOCUMENT_ROOT'] . '/scripts/IAdb.inc.php');
 }
 ```
 
+# star_background_interactive_anim (javascript-animation)
+**Projekta mērķis** : Ar javascript palīdzību izveidot animacīju, kur zvaigznes mūk nu kursora.  
+**Kur tiek pielietots** : Personīgos projektos.  
+
+**Animāciju var aplūkot šeit:**  
+https://i.gyazo.com/381ed5f25669596a576cf6fd06f6a97b.mp4  
+
+# text_scramble_anim (javascript-animation)
+**Projekta mērķis** : Ar javascript palīdzību izveidot animacīju, kur tekstam ir matriksa effekts.  
+**Kur tiek pielietots** : Personīgos projektos.  
+
+**Animāciju var aplūkot šeit:**  
+https://i.gyazo.com/f55b2a07044d91d56b02147f2f31e187.mp4 
 
