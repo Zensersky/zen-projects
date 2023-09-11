@@ -652,3 +652,42 @@ https://i.gyazo.com/381ed5f25669596a576cf6fd06f6a97b.mp4
 **Animāciju var aplūkot šeit:**  
 https://i.gyazo.com/f55b2a07044d91d56b02147f2f31e187.mp4 
 
+# binance-bot-python
+**Projekta mērķis** : Ar python un selenium palīdzību, nolasīt datus no mājaslapas un veikt pirkumus.  
+**Kur tiek pielietots** : Šobrīd nav pielietojuma.
+
+```python
+rint("Looking for a cheap item to bid on...")
+web_driver.get("https://www.binance.com/en/nft/marketplace?currency=BUSD&tradeType=1&amountFrom=0.1&amountTo=0.5&page=1&rows=16&order=set_end_time%401")
+
+try:
+    wait = WebDriverWait(web_driver, 5)
+    FIRST_NFT_ITEM = wait.until(EC.visibility_of_element_located((By.XPATH, BINANCE_NFT_MARKETPLACE_ITEMS_XPATH)))
+except NoSuchElementException:
+    print("Failed locating NFT Marketplace Biddable Item...")
+    web_driver.quit()
+
+#Click on the item to be redirected
+print("Opening NFT MarketPlace item...")
+FIRST_NFT_ITEM.click()
+
+#Waiting for some time for the request to go thru
+time.sleep(3)
+
+web_driver.switch_to.window(web_driver.window_handles[1])
+print("Active Window Title : " + web_driver.title)
+
+
+try:
+    wait = WebDriverWait(web_driver, 15)
+    PLACE_BID_BTN = wait.until(EC.visibility_of_element_located((By.XPATH, BINANCE_NFT_MARKETPLACE_PLACE_BID_XPATH)))
+except NoSuchElementException:
+    print("Failed locating NFT Marketplace PLACE BID BTN...")
+    web_driver.quit()
+
+print("Placing BID on item...")
+PLACE_BID_BTN.click()
+```
+
+
+
